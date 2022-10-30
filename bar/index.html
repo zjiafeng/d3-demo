@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+</head>
+<style>
+    .priceXAxis path {
+        stroke: #FE5F64;
+        stroke-width: 0px;
+    }
+
+    .priceXAxis line {
+        stroke: #FE5F64;
+        stroke-width: 0px;
+    }
+
+    .priceXAxis text {
+        fill: #FE5F64;
+        font-size: 10px;
+    }
+
+    .priceYAxis text {
+        fill: #FE5F64;
+        font-size: 12px;
+    }
+
+    .priceYAxis line {
+        stroke: #FE5F64;
+        stroke-width: 0px;
+    }
+
+    .priceYAxis path {
+        stroke: #FE5F64;
+        stroke-width: 2.5px;
+    }
+
+    .grid line {
+        stroke: #FE5F64;
+        stroke-opacity: 0.7;
+    }
+
+    .grid path {
+        stroke-width: 0;
+    }
+</style>
+
+<body>
+    <div id="chart"></div>
+</body>
+<script>
+    // set the dimensions and margins of the graph
+    const margin = { top: 50, right: 30, bottom: 50, left: 90 },
+        width = 1000 - margin.left - margin.right,
+        height = 500 - margin.top - margin.bottom;
+
+    // append the svg object to the body of the page
+    const svg = d3.select("#chart")
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", `translate(${margin.left}, ${margin.top})`);
+
+    /**
+     * data 图表数据
+     * flag 1/首次渲染   0/更新
+     * */
+    const drawXY = (data, flag) => {
+        // X axis
+        d3.select(".priceXAxis").remove();
+        d3.select(".grid").remove();
+
+        const x = d3.scaleLinear()
+            .domain([0, d3.max(data.map(item => item.value * 1))])
+            .range([0, width]);
+        svg.append("g")
+            .attr("class", "priceXAxis")
+            .attr("transform", `translate(0, ${height})`)
+            .call(d3.axisBottom(x))
+
+        // gridlines in x axis function
+        function make_x_gridlines() {
+            return d3.axisBottom(x)
+                .ticks(10)
+        }
+
+        // add the X gridlines
+        svg.append("g")
+            .attr("class", "grid")
+            .attr("transform", "translate(0," + height + ")")
+            .style("stroke-width", "1px")
+            .style("stroke-dasharray", 2)
+            .call(make_x_gridlines()
+                .tickSize(-height)
+                .tickFormat("")
+            )
+
+        if (flag) {
+            // Y axis
+            const y = d3.scaleBand()
+                .range([0, height])
+                .domain(data.map(d => d.key))
+                .padding(.2);
+            svg.append("g")
+                .attr("class", "priceYAxis")
+                .attr("transform", "translate(0, 0)")
+                .call(d3.axisLeft(y))
+            svg.selectAll('rect')
+                .data(data).enter()
+                .append('rect')
+                .transition()
+                .duration(1000)
+                .ease(d3.easeLinear)
+                .attr("x", x(0.2))
+                .attr("y", d => y(d.key))
+                .attr("width", d => x(d.value))
+                .attr("height", y.bandwidth() / 1.2)
+                .attr("fill", "#69b3a2")
+        } else {
+            svg.selectAll("rect")     // select rects to be updated
+                .data(data)            // New data binded to rects
+                .transition()
+                .duration(1000)
+                .ease(d3.easeLinear)
+                .attr("width", d => x(d.value)) // visual attribute to be updated
+        }
+    }
+
+    //Reading the data from the CSV file
+    d3.csv('airbnbTop10Suburbs.csv').then(jsonData => {
+        let data = jsonData.map(item => {
+            return { key: item.neighbourhood, value: item['All'] }
+        })
+        drawXY(data, 1)
+    });
+
+    //set the choices for buttons on the dropdown menue
+    var allGroup = ["All", "OneToFour", "FiveToEight", "MoreThanNine"]
+
+    // Initialize the button
+    var dropdownButton = d3.select("#chart")
+        .append('select')
+
+    dropdownButton // Add a button
+        .selectAll('myOptions') // Next 4 lines add 6 options = 6 colors
+        .data(allGroup)
+        .enter()
+        .append('option')
+        .text(function (d) { return d; }) // text showed in the menu
+        .attr("value", function (d) { return d; }) // corresponding value returned by the button
+
+    // When the button is changed, run the updateChart function
+    dropdownButton.on("change", async function (d) {
+        // recover the option that has been chosen
+        let selectedOption = d3.select(this).property("value")
+        selectedOption = selectedOption === 'FiveToEight' ? '5-8cap' : selectedOption
+        let jsonData = await d3.csv("./airbnbTop10Suburbs.csv")
+        let data = jsonData.map(item => {
+            return { key: item.neighbourhood, value: item[selectedOption] }
+        })
+        drawXY(data, 0)
+    })
+</script>
+</html>
